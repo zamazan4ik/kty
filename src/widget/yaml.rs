@@ -93,7 +93,7 @@ impl Yaml {
     {
         Tab::builder()
             .name(name)
-            .constructor(Box::new(move || Self::new(&resource).boxed()))
+            .constructor(Box::new(move || Self::new(&resource).boxed().into()))
             .build()
     }
 }
@@ -117,7 +117,10 @@ impl Widget for Yaml {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let lines = to_lines(self.txt.as_str());
 
-        self.position.y = self.position.y.clamp(0, lines.len() as u16);
+        self.position.y = self
+            .position
+            .y
+            .clamp(0, (lines.len() as u16).saturating_sub(area.height));
 
         frame.render_widget(
             Paragraph::new(lines).scroll((self.position.y, self.position.x)),

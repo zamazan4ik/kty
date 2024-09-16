@@ -10,7 +10,11 @@ use ratatui::{
 };
 use tachyonfx::{fx, EffectTimer, Interpolation};
 
-use super::{error::Error, view::View, Placement, Widget};
+use super::{
+    error::Error,
+    view::{Element, View},
+    Placement, Widget,
+};
 use crate::{
     events::{Broadcast, Event},
     fx::{horizontal_wipe, Animated, Start},
@@ -20,11 +24,11 @@ use crate::{
 #[derive(Builder)]
 pub struct Tab {
     name: String,
-    constructor: Box<dyn Fn() -> Box<dyn Widget> + Send>,
+    constructor: Box<dyn Fn() -> Element + Send>,
 }
 
 impl Tab {
-    pub fn widget(&self) -> Box<dyn Widget> {
+    pub fn widget(&self) -> Element {
         (self.constructor)()
     }
 }
@@ -117,8 +121,8 @@ impl TabbedView {
         #[builder(default = Style::default().add_modifier(Modifier::REVERSED))] style: Style,
     ) -> Self {
         let mut widgets = vec![
-            Bar::new(&tabs, style).boxed(),
-            Divider::builder().build().boxed(),
+            Bar::new(&tabs, style).boxed().into(),
+            Divider::builder().build().boxed().into(),
         ];
 
         if !tabs.is_empty() {
@@ -148,19 +152,30 @@ impl Widget for TabbedView {
                 // TODO: this is *probably* a valid assumption, but it might need to be actually
                 // checked.
                 self.view.pop();
+
+                let el = self.items[idx].widget();
+
                 self.view.push(
-                    Animated::builder()
-                        .widget(self.items[idx].widget())
-                        .effect(fx::parallel(&[
-                            fx::coalesce(EffectTimer::from_ms(500, Interpolation::SineInOut)),
-                            horizontal_wipe()
-                                .buffer(buffer.clone())
-                                .timer(EffectTimer::from_ms(500, Interpolation::SineInOut))
-                                .start(start)
-                                .call(),
-                        ]))
-                        .build()
-                        .boxed(),
+                    Element::builder()
+                        .widget(
+                            Animated::builder()
+                                .widget(el.widget)
+                                .effect(fx::parallel(&[
+                                    fx::coalesce(EffectTimer::from_ms(
+                                        500,
+                                        Interpolation::SineInOut,
+                                    )),
+                                    horizontal_wipe()
+                                        .buffer(buffer.clone())
+                                        .timer(EffectTimer::from_ms(500, Interpolation::SineInOut))
+                                        .start(start)
+                                        .call(),
+                                ]))
+                                .build()
+                                .boxed(),
+                        )
+                        .terminal(el.terminal)
+                        .build(),
                 );
 
                 Ok(Broadcast::Consumed)
@@ -171,7 +186,7 @@ impl Widget for TabbedView {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         if let Err(err) = self.view.draw(frame, area) {
-            self.view.push(Error::from(err).boxed());
+            self.view.push(Error::from(err).boxed().into());
         }
 
         Ok(())

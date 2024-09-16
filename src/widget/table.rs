@@ -17,7 +17,7 @@ use super::{
     error::Error,
     input::Text,
     nav::{move_cursor, Movement},
-    view::View,
+    view::{Element, View},
     BoxWidget, Widget,
 };
 use crate::{
@@ -226,7 +226,12 @@ impl Filtered {
         Self {
             constructor,
             filter: table.filter(),
-            view: View::builder().widgets(vec![table.boxed()]).build(),
+            view: View::builder()
+                .widgets(vec![Element::builder()
+                    .widget(table.boxed())
+                    .terminal(true)
+                    .build()])
+                .build(),
         }
     }
 
@@ -247,7 +252,7 @@ impl Filtered {
             .widget(widget)
             .build();
 
-        self.view.push(detail.boxed());
+        self.view.push(detail.boxed().into());
 
         Ok(())
     }
@@ -263,7 +268,8 @@ impl Widget for Filtered {
                     .title("Filter")
                     .content(self.filter.clone())
                     .build()
-                    .boxed(),
+                    .boxed()
+                    .into(),
             );
 
             return Ok(Broadcast::Consumed);
@@ -277,7 +283,7 @@ impl Widget for Filtered {
             }
             Ok(x) => Ok(x),
             Err(e) => {
-                self.view.push(Error::from(e).boxed());
+                self.view.push(Error::from(e).boxed().into());
 
                 Ok(Broadcast::Consumed)
             }

@@ -79,6 +79,7 @@ impl Shell {
                     .pod(pod.clone())
                     .build()
                     .boxed()
+                    .into()
             }))
             .build()
     }

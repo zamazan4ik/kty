@@ -88,7 +88,7 @@ impl Log {
         Tab::builder()
             .name(name)
             .constructor(Box::new(move || {
-                Log::new(client.clone(), pod.clone()).boxed()
+                Log::new(client.clone(), pod.clone()).boxed().into()
             }))
             .build()
     }

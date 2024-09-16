@@ -7,31 +7,65 @@ use ratatui::{
     Frame,
 };
 
-use super::{propagate, BoxWidget, Widget};
+use super::{propagate, BoxWidget, Placement, Widget};
 use crate::events::{Broadcast, Event};
+
+#[derive(Builder)]
+pub struct Element {
+    pub widget: BoxWidget,
+    #[builder(default)]
+    pub terminal: bool,
+}
+
+impl Widget for Element {
+    fn dispatch(&mut self, event: &Event, buffer: &Buffer, area: Rect) -> Result<Broadcast> {
+        self.widget.dispatch(event, buffer, area)
+    }
+
+    fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
+        self.widget.draw(frame, area)
+    }
+
+    fn placement(&self) -> Placement {
+        self.widget.placement()
+    }
+
+    fn zindex(&self) -> u16 {
+        self.widget.zindex()
+    }
+}
+
+impl From<BoxWidget> for Element {
+    fn from(widget: BoxWidget) -> Self {
+        Self {
+            widget,
+            terminal: false,
+        }
+    }
+}
 
 #[derive(Builder)]
 pub struct View {
     #[builder(default)]
-    widgets: Vec<BoxWidget>,
+    widgets: Vec<Element>,
 
     #[builder(default)]
     show_all: bool,
 }
 
 impl View {
-    pub fn push(&mut self, widget: BoxWidget) {
+    pub fn push(&mut self, widget: Element) {
         self.widgets.push(widget);
     }
 
     pub fn pop(&mut self) -> Option<BoxWidget> {
-        self.widgets.pop()
+        self.widgets.pop().map(|element| element.widget)
     }
 
     fn layers<'a>(
-        widgets: impl Iterator<Item = &'a mut BoxWidget>,
+        widgets: impl Iterator<Item = &'a mut Element>,
         area: Rect,
-    ) -> Vec<Vec<(Rect, &'a mut BoxWidget)>> {
+    ) -> Vec<Vec<(Rect, &'a mut Element)>> {
         let chunks = widgets.chunk_by(|widget| widget.zindex());
 
         chunks
@@ -52,11 +86,12 @@ impl View {
 
 impl Widget for View {
     fn dispatch(&mut self, event: &Event, buffer: &Buffer, area: Rect) -> Result<Broadcast> {
-        for (i, widget) in self.widgets.iter_mut().enumerate().rev() {
-            propagate!(widget.dispatch(event, buffer, area), {
-                if i == 0 {
+        for (i, el) in self.widgets.iter_mut().enumerate().rev() {
+            propagate!(el.dispatch(event, buffer, area), {
+                if el.terminal {
                     return Ok(Broadcast::Exited);
                 }
+
                 self.widgets.remove(i);
             });
         }
